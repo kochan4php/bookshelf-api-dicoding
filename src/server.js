@@ -11,5 +11,5 @@ const api = require('./api');
     server.route(api);
 
     await server.start();
-    console.log('Server in running on $s', server.info.uri);
+    console.log('Server in running on %s', server.info.uri);
 })();
