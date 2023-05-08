@@ -1,9 +1,9 @@
 const { nanoid } = require('nanoid');
-const books = require('./books');
-const { failResponse } = require('./helpers');
+const books = require('../models/books');
+const { failResponse } = require('../helpers');
 
 module.exports = {
-    addBook: (request, h) => {
+    addNewBook: (request, h) => {
         try {
             const {
                 name,
@@ -139,7 +139,7 @@ module.exports = {
         }
     },
 
-    updateBook: (request, h) => {
+    updateSpecifiedBook: (request, h) => {
         try {
             const { bookId } = request.params;
             const bookIndex = books.findIndex((item) => item.id === bookId);
@@ -196,7 +196,7 @@ module.exports = {
         }
     },
 
-    deleteBook: (request, h) => {
+    deleteSpecifiedBook: (request, h) => {
         try {
             const { bookId } = request.params;
             const bookIndex = books.findIndex((item) => item.id === bookId);
