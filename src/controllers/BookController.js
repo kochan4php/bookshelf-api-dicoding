@@ -49,7 +49,7 @@ module.exports = {
             const insertedAt = new Date().toISOString();
             const updatedAt = insertedAt;
 
-            const resultBooks = await DB.query(
+            const insertBook = await DB.query(
                 `INSERT INTO books (
                     id, name, year, author, summary, publisher, page_count, read_page, finished, reading, inserted_at, updated_at
                 ) VALUES (
@@ -71,7 +71,7 @@ module.exports = {
                 ]
             );
 
-            if (!resultBooks.rowCount) {
+            if (!insertBook.rowCount) {
                 throw new Error('Gagal menambahkan buku');
             }
 
@@ -142,7 +142,7 @@ module.exports = {
             const result = await DB.query('SELECT * FROM books WHERE id = $1', [
                 bookId
             ]);
-            const book = result.rows;
+            const book = result.rows[0];
 
             if (book.length === 0) {
                 const message = 'Buku tidak ditemukan';
