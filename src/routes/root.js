@@ -5,7 +5,7 @@ module.exports = [
         handler: (request, h) => {
             const response = h.response({
                 message:
-                    "Welcome to NodeJS Bookshelf Submission Backend API with Hapi Framework! Access '/books' path to do CRUD bookshelf operation."
+                    "Welcome to NodeJS Bookshelf Submission Backend API with Hapi Framework and PostgreSQL Database with node-postgres! Access '/books' path to do CRUD bookshelf operation."
             });
 
             response.code(200);
