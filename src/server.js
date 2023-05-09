@@ -1,15 +1,23 @@
 const Hapi = require('@hapi/hapi');
+const DB = require('./database');
 const api = require('./routes/api');
 
 (async () => {
-    const server = Hapi.server({
-        port: process.env.PORT || 9000,
-        host: process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0',
-        routes: { cors: true }
-    });
+    try {
+        await DB.connect();
 
-    server.route(api);
+        const server = Hapi.server({
+            port: process.env.PORT || 9000,
+            host:
+                process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0',
+            routes: { cors: true }
+        });
 
-    await server.start();
-    console.log('Server in running on %s', server.info.uri);
+        server.route(api);
+
+        await server.start();
+        console.log('Server in running on %s', server.info.uri);
+    } catch (err) {
+        console.log(err.message);
+    }
 })();

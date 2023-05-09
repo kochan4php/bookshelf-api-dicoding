@@ -1,22 +1,10 @@
 const { nanoid } = require('nanoid');
-const Joi = require('joi');
-const books = require('../models/books');
 const { failResponse } = require('../helpers');
-
-const bookValidate = () => {
-    return Joi.object({
-        year: Joi.number().max(new Date().getFullYear()).required(),
-        author: Joi.string().max(255).min(5).required(),
-        summary: Joi.string().min(5).required(),
-        publisher: Joi.string().max(255).min(5).required(),
-        pageCount: Joi.number().required(),
-        readPage: Joi.number().required(),
-        reading: Joi.boolean().required()
-    });
-};
+const DB = require('../database');
+const bookValidation = require('../validations/bookValidation');
 
 module.exports = {
-    addNewBook: (request, h) => {
+    addNewBook: async (request, h) => {
         try {
             const {
                 name,
@@ -40,7 +28,7 @@ module.exports = {
                 return failResponse(h, 400, message);
             }
 
-            const schema = bookValidate();
+            const schema = bookValidation();
             const result = schema.validate({
                 year,
                 author,
@@ -55,29 +43,35 @@ module.exports = {
                 return failResponse(h, 400, result.error.message);
             }
 
-            const id = nanoid(16);
-            const finished = pageCount === readPage;
+            const id = nanoid(30);
+            const finished = pageCount === readPage ? 1 : 0;
+            const readStatus = reading ? 1 : 0;
             const insertedAt = new Date().toISOString();
             const updatedAt = insertedAt;
 
-            books.push({
-                id,
-                name,
-                year,
-                author,
-                summary,
-                publisher,
-                pageCount,
-                readPage,
-                finished,
-                reading,
-                insertedAt,
-                updatedAt
-            });
+            const resultBooks = await DB.query(
+                `INSERT INTO books (
+                    id, name, year, author, summary, publisher, page_count, read_page, finished, reading, inserted_at, updated_at
+                ) VALUES (
+                    $1 ,$2 ,$3 ,$4 ,$5 ,$6 ,$7 ,$8 ,$9, $10, $11, $12
+                ) RETURNING id;`,
+                [
+                    id,
+                    name,
+                    year,
+                    author,
+                    summary,
+                    publisher,
+                    pageCount,
+                    readPage,
+                    finished,
+                    readStatus,
+                    insertedAt,
+                    updatedAt
+                ]
+            );
 
-            const isSuccess = books.find((item) => item.id === id);
-
-            if (!isSuccess) {
+            if (!resultBooks.rowCount) {
                 throw new Error('Gagal menambahkan buku');
             }
 
@@ -97,21 +91,21 @@ module.exports = {
         }
     },
 
-    getAllBooks: (request, h) => {
+    getAllBooks: async (request, h) => {
         try {
             const { name, reading, finished } = request.query;
-
-            let allBooks = books;
+            const result = await DB.query('SELECT * FROM books');
+            let allBooks = result.rows;
 
             if (reading) {
                 allBooks = allBooks.filter(
-                    (item) => item.reading === Boolean(Number(reading))
+                    (item) => item.reading === Number(reading)
                 );
             }
 
             if (finished) {
                 allBooks = allBooks.filter(
-                    (item) => item.finished === Boolean(Number(finished))
+                    (item) => item.finished === Number(finished)
                 );
             }
 
@@ -142,12 +136,15 @@ module.exports = {
         }
     },
 
-    getSpecifiedBook: (request, h) => {
+    getSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const book = books.find((item) => item.id === bookId);
+            const result = await DB.query('SELECT * FROM books WHERE id = $1', [
+                bookId
+            ]);
+            const book = result.rows;
 
-            if (!book) {
+            if (book.length === 0) {
                 const message = 'Buku tidak ditemukan';
                 return failResponse(h, 404, message);
             }
@@ -167,16 +164,9 @@ module.exports = {
         }
     },
 
-    updateSpecifiedBook: (request, h) => {
+    updateSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const bookIndex = books.findIndex((item) => item.id === bookId);
-
-            if (bookIndex === -1) {
-                const message = 'Gagal memperbarui buku. Id tidak ditemukan';
-                return failResponse(h, 404, message);
-            }
-
             const {
                 name,
                 year,
@@ -199,7 +189,7 @@ module.exports = {
                 return failResponse(h, 400, message);
             }
 
-            const schema = bookValidate();
+            const schema = bookValidation();
             const result = schema.validate({
                 year,
                 author,
@@ -214,17 +204,44 @@ module.exports = {
                 return failResponse(h, 400, result.error.message);
             }
 
-            books[bookIndex] = {
-                ...books[bookIndex],
-                name,
-                year,
-                author,
-                summary,
-                publisher,
-                pageCount,
-                readPage,
-                reading
-            };
+            const finished = pageCount === readPage ? 1 : 0;
+            const readStatus = reading ? 1 : 0;
+            const updatedAt = new Date().toISOString();
+
+            const updateBook = await DB.query(
+                `
+                    UPDATE books SET
+                        name = $2,
+                        year = $3,
+                        author = $4, 
+                        summary = $5, 
+                        publisher = $6,
+                        page_count = $7,
+                        read_page = $8,
+                        finished = $9,
+                        reading = $10,
+                        updated_at = $11
+                    WHERE id = $1
+                `,
+                [
+                    bookId,
+                    name,
+                    year,
+                    author,
+                    summary,
+                    publisher,
+                    pageCount,
+                    readPage,
+                    finished,
+                    readStatus,
+                    updatedAt
+                ]
+            );
+
+            if (!updateBook.rowCount) {
+                const message = 'Gagal memperbarui buku. Id tidak ditemukan';
+                return failResponse(h, 404, message);
+            }
 
             const response = h.response({
                 status: 'success',
@@ -239,17 +256,17 @@ module.exports = {
         }
     },
 
-    deleteSpecifiedBook: (request, h) => {
+    deleteSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const bookIndex = books.findIndex((item) => item.id === bookId);
+            const result = await DB.query('DELETE FROM books WHERE id = $1', [
+                bookId
+            ]);
 
-            if (bookIndex === -1) {
+            if (!result.rowCount) {
                 const message = 'Buku gagal dihapus. Id tidak ditemukan';
                 return failResponse(h, 404, message);
             }
-
-            books.splice(bookIndex, 1);
 
             const response = h.response({
                 status: 'success',
