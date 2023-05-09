@@ -17,10 +17,12 @@
         "eslint-plugin-import": "^2.25.2",
         "eslint-plugin-n": "^15.0.0",
         "eslint-plugin-promise": "^6.0.0",
-        "nodemon": "^2.0.22"
+        "nodemon": "^2.0.22",
+        "prisma": "^4.14.0"
     },
     "dependencies": {
         "@hapi/hapi": "^21.3.2",
+        "@prisma/client": "^4.14.0",
         "joi": "^17.9.2",
         "nanoid": "3.x.x"
     }

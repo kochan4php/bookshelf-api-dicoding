@@ -1,22 +1,12 @@
 const { nanoid } = require('nanoid');
-const Joi = require('joi');
-const books = require('../models/books');
 const { failResponse } = require('../helpers');
+const { PrismaClient } = require('@prisma/client');
+const bookValidation = require('../validations/bookValidation');
 
-const bookValidate = () => {
-    return Joi.object({
-        year: Joi.number().max(new Date().getFullYear()).required(),
-        author: Joi.string().max(255).min(5).required(),
-        summary: Joi.string().min(5).required(),
-        publisher: Joi.string().max(255).min(5).required(),
-        pageCount: Joi.number().required(),
-        readPage: Joi.number().required(),
-        reading: Joi.boolean().required()
-    });
-};
+const prisma = new PrismaClient();
 
 module.exports = {
-    addNewBook: (request, h) => {
+    addNewBook: async (request, h) => {
         try {
             const {
                 name,
@@ -40,7 +30,7 @@ module.exports = {
                 return failResponse(h, 400, message);
             }
 
-            const schema = bookValidate();
+            const schema = bookValidation();
             const result = schema.validate({
                 year,
                 author,
@@ -60,24 +50,28 @@ module.exports = {
             const insertedAt = new Date().toISOString();
             const updatedAt = insertedAt;
 
-            books.push({
-                id,
-                name,
-                year,
-                author,
-                summary,
-                publisher,
-                pageCount,
-                readPage,
-                finished,
-                reading,
-                insertedAt,
-                updatedAt
+            await prisma.book.create({
+                data: {
+                    id,
+                    name,
+                    year,
+                    author,
+                    summary,
+                    publisher,
+                    page_count: pageCount,
+                    read_page: readPage,
+                    finished,
+                    reading,
+                    inserted_at: insertedAt,
+                    updated_at: updatedAt
+                }
             });
 
-            const isSuccess = books.find((item) => item.id === id);
+            const resultBook = await prisma.book.findFirst({
+                where: { id }
+            });
 
-            if (!isSuccess) {
+            if (!resultBook) {
                 throw new Error('Gagal menambahkan buku');
             }
 
@@ -97,31 +91,32 @@ module.exports = {
         }
     },
 
-    getAllBooks: (request, h) => {
+    getAllBooks: async (request, h) => {
         try {
             const { name, reading, finished } = request.query;
-
-            let allBooks = books;
+            let books = await prisma.book.findMany({
+                orderBy: { inserted_at: 'desc' }
+            });
 
             if (reading) {
-                allBooks = allBooks.filter(
+                books = books.filter(
                     (item) => item.reading === Boolean(Number(reading))
                 );
             }
 
             if (finished) {
-                allBooks = allBooks.filter(
+                books = books.filter(
                     (item) => item.finished === Boolean(Number(finished))
                 );
             }
 
             if (name) {
-                allBooks = allBooks.filter((item) =>
+                books = books.filter((item) =>
                     item.name.toLowerCase().includes(name.toLowerCase())
                 );
             }
 
-            allBooks = allBooks.map((item) => ({
+            books = books.map((item) => ({
                 id: item.id,
                 name: item.name,
                 publisher: item.publisher
@@ -130,7 +125,7 @@ module.exports = {
             const response = h.response({
                 status: 'success',
                 data: {
-                    books: allBooks
+                    books
                 }
             });
 
@@ -142,10 +137,10 @@ module.exports = {
         }
     },
 
-    getSpecifiedBook: (request, h) => {
+    getSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const book = books.find((item) => item.id === bookId);
+            const book = await prisma.book.findFirst({ where: { id: bookId } });
 
             if (!book) {
                 const message = 'Buku tidak ditemukan';
@@ -167,12 +162,14 @@ module.exports = {
         }
     },
 
-    updateSpecifiedBook: (request, h) => {
+    updateSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const bookIndex = books.findIndex((item) => item.id === bookId);
+            const book = await prisma.book.findFirst({
+                where: { id: bookId }
+            });
 
-            if (bookIndex === -1) {
+            if (!book) {
                 const message = 'Gagal memperbarui buku. Id tidak ditemukan';
                 return failResponse(h, 404, message);
             }
@@ -199,7 +196,7 @@ module.exports = {
                 return failResponse(h, 400, message);
             }
 
-            const schema = bookValidate();
+            const schema = bookValidation();
             const result = schema.validate({
                 year,
                 author,
@@ -214,17 +211,23 @@ module.exports = {
                 return failResponse(h, 400, result.error.message);
             }
 
-            books[bookIndex] = {
-                ...books[bookIndex],
-                name,
-                year,
-                author,
-                summary,
-                publisher,
-                pageCount,
-                readPage,
-                reading
-            };
+            const updatedAt = new Date().toISOString();
+            const finished = pageCount === readPage;
+            await prisma.book.update({
+                where: { id: bookId },
+                data: {
+                    name,
+                    year,
+                    author,
+                    summary,
+                    publisher,
+                    page_count: pageCount,
+                    read_page: readPage,
+                    finished,
+                    reading,
+                    updated_at: updatedAt
+                }
+            });
 
             const response = h.response({
                 status: 'success',
@@ -239,17 +242,19 @@ module.exports = {
         }
     },
 
-    deleteSpecifiedBook: (request, h) => {
+    deleteSpecifiedBook: async (request, h) => {
         try {
             const { bookId } = request.params;
-            const bookIndex = books.findIndex((item) => item.id === bookId);
+            const book = await prisma.book.findFirst({
+                where: { id: bookId }
+            });
 
-            if (bookIndex === -1) {
+            if (!book) {
                 const message = 'Buku gagal dihapus. Id tidak ditemukan';
                 return failResponse(h, 404, message);
             }
 
-            books.splice(bookIndex, 1);
+            await prisma.book.delete({ where: { id: bookId } });
 
             const response = h.response({
                 status: 'success',
