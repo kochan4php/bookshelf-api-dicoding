@@ -1,6 +1,19 @@
 const { nanoid } = require('nanoid');
+const Joi = require('joi');
 const books = require('../models/books');
 const { failResponse } = require('../helpers');
+
+const bookValidate = () => {
+    return Joi.object({
+        year: Joi.number().max(new Date().getFullYear()).required(),
+        author: Joi.string().max(255).min(5).required(),
+        summary: Joi.string().min(5).required(),
+        publisher: Joi.string().max(255).min(5).required(),
+        pageCount: Joi.number().required(),
+        readPage: Joi.number().required(),
+        reading: Joi.boolean().required()
+    });
+};
 
 module.exports = {
     addNewBook: (request, h) => {
@@ -25,6 +38,21 @@ module.exports = {
                 const message =
                     'Gagal menambahkan buku. readPage tidak boleh lebih besar dari pageCount';
                 return failResponse(h, 400, message);
+            }
+
+            const schema = bookValidate();
+            const result = schema.validate({
+                year,
+                author,
+                summary,
+                publisher,
+                pageCount,
+                readPage,
+                reading
+            });
+
+            if (result.error) {
+                return failResponse(h, 400, result.error.message);
             }
 
             const id = nanoid(16);
@@ -169,6 +197,21 @@ module.exports = {
                 const message =
                     'Gagal memperbarui buku. readPage tidak boleh lebih besar dari pageCount';
                 return failResponse(h, 400, message);
+            }
+
+            const schema = bookValidate();
+            const result = schema.validate({
+                year,
+                author,
+                summary,
+                publisher,
+                pageCount,
+                readPage,
+                reading
+            });
+
+            if (result.error) {
+                return failResponse(h, 400, result.error.message);
             }
 
             books[bookIndex] = {
