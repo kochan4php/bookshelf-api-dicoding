@@ -1,6 +1,7 @@
 const Hapi = require('@hapi/hapi');
 const DB = require('./database');
 const api = require('./routes/api');
+require('dotenv').config();
 
 (async () => {
     try {
